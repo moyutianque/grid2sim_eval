@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-
+import os.path as osp
 import numpy as np
 from habitat import Env, logger
 from habitat.config.default import Config
@@ -67,10 +67,10 @@ def evaluate_agent(config: Config) -> None:
     for stat_key in stats.keys():
         logger.info("{}: {:.3f}".format(stat_key, stats[stat_key]))
 
-    with open(f"stats_{config.EVAL.NONLEARNING.AGENT}_{split}.json", "w") as f:
+    with open(osp.join(config.EVAL.NONLEARNING.DUMP_DIR, f"stats_{split}.json"), "w") as f:
         json.dump(stats, f, indent=4)
 
-    with open(f"glove_{split}_result_sim_loc.json","w") as f:
+    with open(osp.join(config.EVAL.NONLEARNING.DUMP_DIR, f"glove_{split}_result_sim_loc.json"),"w") as f:
         json.dump(path_data,f)
     print("DONE !!")
     
@@ -79,7 +79,8 @@ class GridToSimAgent(Agent):
     def __init__(self, config, env):
       
         with open(config.RESULT_PATH, "r") as f:
-            self.data = json.load(f)
+            self.data = {line['episode_id']:line for line in json.load(f)}
+            
         self.map_root = config.MAP_ROOT
 
         self.actions = [
@@ -128,7 +129,7 @@ class GridToSimAgent(Agent):
                     coordx = get_surrounding_point_rel_pos_with_radius3d(0,1)
                 else:
                     # other point search a region inside sphere
-                    coordx = get_surrounding_point_rel_pos_with_radius3d(1,41)
+                    coordx = get_surrounding_point_rel_pos_with_radius3d(1, 41)
  
                 try:
                     self.sim_path[self.tmp_goal_index]
@@ -148,6 +149,8 @@ class GridToSimAgent(Agent):
                 if flag:
                     break
                 self.tmp_goal_index -= 1
+                if self.tmp_goal_index == -10:
+                    print(episode_id)
             
             if not flag:
                 print(episode_id, self.sim_path, "\n")

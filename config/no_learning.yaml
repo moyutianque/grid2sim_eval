@@ -12,15 +12,16 @@ RESULTS_DIR: data/checkpoints/seq2seq_small/evals
 
 EVAL:
   USE_CKPT_CONFIG: False
-  SPLIT: val_unseen
+  SPLIT: ""
   EPISODE_COUNT: 100
   EVAL_NONLEARNING: True
   DATA_PATH: ./data/mln_v1/annt/{split}/{split}.json.gz 
   NONLEARNING:
     AGENT: GridToSimAgent
-    RESULT_PATH: ./val_unseen_grid2sim_locations.json 
+    RESULT_PATH: ""
     MAP_ROOT: data/mln_v1/maps/gmap_floor1_mpp_word_0.05_channel_last_with_bounds
+    DUMP_DIR: ""
 TASK_CONFIG:
   DATASET:
     DATA_PATH: ./data/mln_v1/annt/{split}/{split}.json.gz 
-    SPLIT: val_unseen
+    SPLIT: ""
