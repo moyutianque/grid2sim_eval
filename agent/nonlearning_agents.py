@@ -105,7 +105,11 @@ class GridToSimAgent(Agent):
         episode_id = self.env.current_episode.episode_id
         if self.current_ep_id is None or episode_id != self.current_ep_id:
             self.current_ep_id =  episode_id
-            ep_results  = self.data[episode_id]
+            try:
+                ep_results  = self.data[episode_id]
+            except:
+                print(f"[WARNING] epid {episode_id} not predicted")
+                return {"action": self.actions[0]}, self.is_nan, episode_id
 
             grid2sim(ep_results, map_root=self.map_root, dump_dir=None) # process prediction results
 
