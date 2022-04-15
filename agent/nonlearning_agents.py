@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 import os.path as osp
+from socket import IP_ADD_MEMBERSHIP
 import numpy as np
 from habitat import Env, logger
 from habitat.config.default import Config
@@ -9,6 +10,7 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from tqdm import tqdm, trange
 import json 
 from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
+from habitat.tasks.nav.nav import DistanceToGoal, Success
 
 from utils import get_surrounding_point_rel_pos_with_radius3d
 from grid2sim_utils import grid2sim
@@ -41,18 +43,25 @@ def evaluate_agent(config: Config) -> None:
     stats = defaultdict(float)
     no_reachable_eps = []
     num_episodes = min(config.EVAL.EPISODE_COUNT, len(env.episodes))
-
+    
+    eval_dict = {} # record is_success of each episode
     for _ in trange(num_episodes):
         obs = env.reset()
         agent.reset()
-        path_data[env.current_episode.episode_id] = []
     
         while not env.episode_over:
             action ,is_nan, ep_id = agent.act(obs)
             if is_nan:
                 no_reachable_eps.append(ep_id)
+
             obs = env.step(action)
-            path_data[env.current_episode.episode_id].append(env._sim.get_agent_state().position.tolist())
+
+        is_success = env.task.measurements.measures[Success.cls_uuid].get_metric()
+        eval_dict[agent.ep_results['episode_id']] = {
+            'episode': agent.ep_results['episode_id'], 
+            'traj_id': agent.ep_results['ep_id'],
+            'is_success': is_success>0.5}
+ 
         if is_nan:
             num_nan += 1
         for m, v in env.get_metrics().items():
@@ -70,8 +79,8 @@ def evaluate_agent(config: Config) -> None:
     with open(osp.join(config.EVAL.NONLEARNING.DUMP_DIR, f"stats_{split}.json"), "w") as f:
         json.dump(stats, f, indent=4)
 
-    with open(osp.join(config.EVAL.NONLEARNING.DUMP_DIR, f"glove_{split}_result_sim_loc.json"),"w") as f:
-        json.dump(path_data,f)
+    with open(osp.join(config.EVAL.NONLEARNING.DUMP_DIR, f"{split}_sim_results.json"),"w") as f:
+        json.dump(eval_dict,f)
     print("DONE !!")
     
 class GridToSimAgent(Agent):
@@ -107,6 +116,7 @@ class GridToSimAgent(Agent):
             self.current_ep_id =  episode_id
             try:
                 ep_results  = self.data[episode_id]
+                self.ep_results = ep_results
             except:
                 print(f"[WARNING] epid {episode_id} not predicted")
                 return {"action": self.actions[0]}, self.is_nan, episode_id
