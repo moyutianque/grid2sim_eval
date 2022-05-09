@@ -43,6 +43,7 @@ TASK:
     SUCCESS_DISTANCE: 3.0
   NDTW:
     GT_PATH: data/datasets/R2R_VLNCE_v1-2_preprocessed/{split}/{split}_gt.json.gz
+    
 DATASET:
   TYPE: VLN-CE-v1
   SPLIT: train

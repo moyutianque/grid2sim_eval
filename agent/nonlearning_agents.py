@@ -37,6 +37,8 @@ def evaluate_agent(config: Config) -> None:
 
     if config.EVAL.NONLEARNING.AGENT == 'GridToSimAgent':
         agent = GridToSimAgent(config.EVAL.NONLEARNING, env)
+    elif config.EVAL.NONLEARNING.AGENT == 'ActionSimAgent':
+        agent = ActionSimAgent(config.EVAL.NONLEARNING, env)
     else:
         raise NotImplementedError()
 
@@ -53,14 +55,17 @@ def evaluate_agent(config: Config) -> None:
             action ,is_nan, ep_id = agent.act(obs)
             if is_nan:
                 no_reachable_eps.append(ep_id)
-
+            
             obs = env.step(action)
 
         is_success = env.task.measurements.measures[Success.cls_uuid].get_metric()
-        eval_dict[agent.ep_results['episode_id']] = {
-            'episode': agent.ep_results['episode_id'], 
-            'traj_id': agent.ep_results['ep_id'],
-            'is_success': is_success>0.5}
+        try:
+            eval_dict[agent.ep_results['episode_id']] = {
+                'episode': agent.ep_results['episode_id'], 
+                'traj_id': agent.ep_results['ep_id'],
+                'is_success': is_success>0.5}
+        except:
+            pass
  
         if is_nan:
             num_nan += 1
@@ -143,7 +148,8 @@ class GridToSimAgent(Agent):
                     coordx = get_surrounding_point_rel_pos_with_radius3d(0,1)
                 else:
                     # other point search a region inside sphere
-                    coordx = get_surrounding_point_rel_pos_with_radius3d(1, 41)
+                    # coordx = get_surrounding_point_rel_pos_with_radius3d(0.2, 11) # unseen
+                    coordx = get_surrounding_point_rel_pos_with_radius3d(0.1, 11) # seen
  
                 try:
                     self.sim_path[self.tmp_goal_index]
@@ -181,3 +187,46 @@ class GridToSimAgent(Agent):
         return {"action": self.actions[act_index]}, self.is_nan, episode_id
 
 
+    
+class ActionSimAgent(Agent):
+
+    def __init__(self, config, env):
+      
+        with open(config.RESULT_PATH, "r") as f:
+            self.data= {v['episode_id']:v['action_seq'] for v in json.load(f)}
+            
+        self.map_root = config.MAP_ROOT
+
+        self.actions = [
+            HabitatSimActions.STOP,
+            HabitatSimActions.MOVE_FORWARD,
+            HabitatSimActions.TURN_LEFT,
+            HabitatSimActions.TURN_RIGHT,
+        ]
+        
+        self.shortest_path_follower = ShortestPathFollower(
+            env._sim, goal_radius=0.2, return_one_hot=False, 
+            stop_on_error=True
+        )
+        self.env = env
+        self.is_nan  = False
+
+    def reset(self):
+        self.action_index = -1 
+        self.current_ep_id = None
+
+    def act(self, observations):
+        episode_id = self.env.current_episode.episode_id
+        if self.current_ep_id is None or episode_id != self.current_ep_id:
+            self.current_ep_id =  episode_id
+            try:
+                action_seq  = self.data[episode_id]
+                self.action_seq = action_seq
+                self.action_index = 0
+            except:
+                print(f"[WARNING] epid {episode_id} not predicted")
+                return {"action": self.actions[0]}, self.is_nan, episode_id
+
+        action = {"action": self.actions[self.action_seq[self.action_index]]}
+        self.action_index+=1
+        return action, self.is_nan, episode_id
